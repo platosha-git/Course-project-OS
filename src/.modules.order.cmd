@@ -1,1 +1,1 @@
-cmd_/home/platosha/Desktop/BMSTU/7sem/OS/src/modules.order := {   echo /home/platosha/Desktop/BMSTU/7sem/OS/src/driver.ko; :; } | awk '!x[$$0]++' - > /home/platosha/Desktop/BMSTU/7sem/OS/src/modules.order
+cmd_/home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/modules.order := {   echo /home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/driver.ko; :; } | awk '!x[$$0]++' - > /home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/modules.order
