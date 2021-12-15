@@ -1,7 +1,7 @@
 #include <stddef.h>
 
 #define DRIVER_VERSION "v1.0"
-#define DRIVER_AUTHOR "olga"
+#define DRIVER_AUTHOR "Olga"
 #define DRIVER_DESC "USB Mouse Click Sound Driver"
 
 /* Button codes */

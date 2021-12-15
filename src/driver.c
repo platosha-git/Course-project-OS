@@ -13,9 +13,11 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-struct usb_mouse {
+struct usb_mouse 
+{
 	char name[128];
 	char phys[64];
+
 	struct usb_device *usbdev;
 	struct input_dev *dev;
 	struct urb *irq;
@@ -25,65 +27,84 @@ struct usb_mouse {
 };
 
 struct task_struct *playback_thread;
-int left_play = 0;
-int right_play = 0;
-int middle_play = 0;
 
-int left_clicked = 0;
-int right_clicked = 0;
-int middle_clicked = 0;
+static int left_play = 0;
+static int left_clicked = 0;
 
-/**
- * Playback thread's function. Plays sounds in the background when 'play' variables are nonzero.
- */
-static int playback_func(void *arg) {
+static int right_play = 0;
+static int right_clicked = 0;
+
+static int middle_play = 0;
+static int middle_clicked = 0;
+
+
+static int playback_func(void *arg) 
+{
 	while (!kthread_should_stop()) {
 		if (left_play) {
 			int result = -1;
-			if (left_clicked)
+			
+			if (left_clicked) {
 				result = call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
-			else
+			}
+			else {
 				result = call_usermodehelper(release_argv[0], release_argv, envp, UMH_NO_WAIT);
+			}
+
 			left_play = 0;
 		}
+
 		if (right_play) {
-			int result = -1;
-			if (right_clicked)
+			int result = -1; 
+
+			if (right_clicked) {
 				result = call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
-			else
+			}
+			else {
 				result = call_usermodehelper(release_argv[0], release_argv, envp, UMH_NO_WAIT);
+			}
+
 			right_play = 0;
 		}
+
 		if (middle_play) {
 			int result = -1;
-			if (middle_clicked)
+			if (middle_clicked) {
 				result = call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
-			else
+			}
+			else {
 				result = call_usermodehelper(release_argv[0], release_argv, envp, UMH_NO_WAIT);
+			}
+
 			middle_play = 0;
 		}
+
 		/* Sleep the thread to relieve the CPU */
 		usleep_range(DELAY_LO, DELAY_HI);
 	}
+
     return 0;
 }
 
 /**
  * Interrupt Request Handler of the USB Request Block of this device driver.
  */
-static void usb_mouse_irq(struct urb *urb) {
+static void usb_mouse_irq(struct urb *urb) 
+{
 	struct usb_mouse *mouse = urb->context;
 	signed char *data = mouse->data;
 	struct input_dev *dev = mouse->dev;
-	int status;
+	int status = 0;
 
 	switch (urb->status) {
-	case 0:			/* success */
+	case 0:
 		break;
+
 	case -ECONNRESET:	/* unlink */
 	case -ENOENT:
 	case -ESHUTDOWN:
 		return;
+
 	/* -EPIPE:  should clear the halt */
 	default:		/* error */
 		goto resubmit;
@@ -92,7 +113,8 @@ static void usb_mouse_irq(struct urb *urb) {
 	if (left_clicked && !(data[0] & LEFT_BTN_BIT)) { /* negedge of left click */
 		left_clicked = 0;
 		left_play    = 1;
-	} else if (!left_clicked && data[0] & LEFT_BTN_BIT) { /* posedge of left click */
+	} 
+	else if (!left_clicked && (data[0] & LEFT_BTN_BIT)) { /* posedge of left click */
 		left_clicked = 1;
 		left_play    = 1;
 	}
@@ -100,7 +122,8 @@ static void usb_mouse_irq(struct urb *urb) {
 	if (right_clicked && !(data[0] & RGHT_BTN_BIT)) { /* negedge of right click */
 		right_clicked = 0;
 		right_play    = 1;
-	} else if (!right_clicked && data[0] & RGHT_BTN_BIT) { /* posedge of right click */
+	} 
+	else if (!right_clicked && (data[0] & RGHT_BTN_BIT)) { /* posedge of right click */
 		right_clicked = 1;
 		right_play    = 1;
 	}
@@ -108,7 +131,8 @@ static void usb_mouse_irq(struct urb *urb) {
 	if (middle_clicked && !(data[0] & RGHT_BTN_BIT)) { /* negedge of middle click */
 		middle_clicked = 0;
 		middle_play    = 1;
-	} else if (!middle_clicked && data[0] & RGHT_BTN_BIT) { /* posedge of middle click */
+	} 
+	else if (!middle_clicked && (data[0] & RGHT_BTN_BIT)) { /* posedge of middle click */
 		middle_clicked = 1;
 		middle_play    = 1;
 	}
@@ -119,65 +143,68 @@ static void usb_mouse_irq(struct urb *urb) {
 	input_report_key(dev, BTN_SIDE,   data[0] & 0x08);
 	input_report_key(dev, BTN_EXTRA,  data[0] & 0x10);
 
-	/* Data indices might be different for different environments */
 	input_report_rel(dev, REL_X,     data[1]);
 	input_report_rel(dev, REL_Y,     data[2]);
 	input_report_rel(dev, REL_WHEEL, data[3]);
 
 	input_sync(dev);
+
 resubmit:
 	status = usb_submit_urb (urb, GFP_ATOMIC);
-	if (status)
-		dev_err(&mouse->usbdev->dev,
-			"can't resubmit intr, %s-%s/input0, status %d\n",
-			mouse->usbdev->bus->bus_name,
-			mouse->usbdev->devpath, status);
+	if (status) {
+		dev_err(&mouse->usbdev->dev, "can't resubmit intr, %s-%s/input0, status %d\n",
+				mouse->usbdev->bus->bus_name,
+				mouse->usbdev->devpath, status);
+	}
 }
 
-static int usb_mouse_open(struct input_dev *dev) {
+static int usb_mouse_open(struct input_dev *dev) 
+{
 	struct usb_mouse *mouse = input_get_drvdata(dev);
 
 	mouse->irq->dev = mouse->usbdev;
-	if (usb_submit_urb(mouse->irq, GFP_KERNEL))
+	if (usb_submit_urb(mouse->irq, GFP_KERNEL)) {
 		return -EIO;
+	}
+
 	return 0;
 }
 
-static void usb_mouse_close(struct input_dev *dev) {
+static void usb_mouse_close(struct input_dev *dev) 
+{
 	struct usb_mouse *mouse = input_get_drvdata(dev);
-
 	usb_kill_urb(mouse->irq);
 }
 
-static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_id *id) {
+static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_id *id) 
+{
 	struct usb_device *dev = interface_to_usbdev(intf);
-	struct usb_host_interface *interface;
-	struct usb_endpoint_descriptor *endpoint;
-	struct usb_mouse *mouse;
-	struct input_dev *input_dev;
-	int pipe, maxp;
 	int error = -ENOMEM;
 
-	interface = intf->cur_altsetting;
+	struct usb_host_interface *interface = intf->cur_altsetting;
 
-	if (interface->desc.bNumEndpoints != 1)
+	if (interface->desc.bNumEndpoints != 1) {
 		return -ENODEV;
+	}
 
-	endpoint = &interface->endpoint[0].desc;
-	if (!usb_endpoint_is_int_in(endpoint))
+	struct usb_endpoint_descriptor *endpoint = &interface->endpoint[0].desc;
+	if (!usb_endpoint_is_int_in(endpoint)) {
 		return -ENODEV;
+	}
 
-	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
-	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
+	int pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
+	int maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
 
-	mouse = kzalloc(sizeof(struct usb_mouse), GFP_KERNEL);
-	input_dev = input_allocate_device();
-	if (!mouse || !input_dev)
+	struct usb_mouse *mouse = kzalloc(sizeof(struct usb_mouse), GFP_KERNEL);
+	struct input_dev *input_dev = input_allocate_device();
+	if (!mouse || !input_dev) {
 		goto fail1;
+	}
 
 	mouse->data = usb_alloc_coherent(dev, 8, GFP_ATOMIC, &mouse->data_dma);
-	if (!mouse->data)
+	if (!mouse->data) {
 		goto fail1;
+	}
 
 	mouse->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!mouse->irq)
@@ -186,20 +213,23 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	mouse->usbdev = dev;
 	mouse->dev = input_dev;
 
-	if (dev->manufacturer)
+	if (dev->manufacturer) {
 		strlcpy(mouse->name, dev->manufacturer, sizeof(mouse->name));
+	}
 
 	if (dev->product) {
-		if (dev->manufacturer)
+		if (dev->manufacturer) {
 			strlcat(mouse->name, " ", sizeof(mouse->name));
+		}
 		strlcat(mouse->name, dev->product, sizeof(mouse->name));
 	}
 
-	if (!strlen(mouse->name))
+	if (!strlen(mouse->name)) {
 		snprintf(mouse->name, sizeof(mouse->name),
 			 "USB HIDBP Mouse %04x:%04x",
 			 le16_to_cpu(dev->descriptor.idVendor),
 			 le16_to_cpu(dev->descriptor.idProduct));
+	}
 
 	usb_make_path(dev, mouse->phys, sizeof(mouse->phys));
 	strlcat(mouse->phys, "/input0", sizeof(mouse->phys));
@@ -229,8 +259,9 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	mouse->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	error = input_register_device(mouse->dev);
-	if (error)
+	if (error) {
 		goto fail3;
+	}
 
 	usb_set_intfdata(intf, mouse);
 
@@ -238,7 +269,8 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	playback_thread = kthread_run(playback_func, NULL, "sound_playback_thread");
 	if (IS_ERR(playback_thread)) {
 		printk(KERN_ERR "Could not create the playback thread.\n");
-	} else {
+	} 
+	else {
 		printk(KERN_INFO "Playback thread created.\n");
 	}
 
@@ -254,7 +286,8 @@ fail1:
 	return error;
 }
 
-static void usb_mouse_disconnect(struct usb_interface *intf) {
+static void usb_mouse_disconnect(struct usb_interface *intf) 
+{
 	struct usb_mouse *mouse = usb_get_intfdata (intf);
 
 	/* Stop the playback thread */
