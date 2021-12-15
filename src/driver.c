@@ -137,11 +137,11 @@ static void usb_mouse_irq(struct urb *urb)
 		right_play    = 1;
 	}
 
-	if (middle_clicked && !(data[0] & RGHT_BTN_BIT)) { /* negedge of middle click */
+	if (middle_clicked && !(data[0] & MIDL_BTN_BIT)) { /* negedge of middle click */
 		middle_clicked = 0;
 		middle_play    = 1;
 	} 
-	else if (!middle_clicked && (data[0] & RGHT_BTN_BIT)) { /* posedge of middle click */
+	else if (!middle_clicked && (data[0] & MIDL_BTN_BIT)) { /* posedge of middle click */
 		middle_clicked = 1;
 		middle_play    = 1;
 	}
