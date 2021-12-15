@@ -86,9 +86,19 @@ static int playback_func(void *arg)
     return 0;
 }
 
-/**
- * Interrupt Request Handler of the USB Request Block of this device driver.
- */
+static int usb_mouse_open(struct input_dev *dev) 
+{
+	struct usb_mouse *mouse = input_get_drvdata(dev);
+
+	mouse->irq->dev = mouse->usbdev;
+	if (usb_submit_urb(mouse->irq, GFP_KERNEL)) {
+		return -EIO;
+	}
+
+	printk(KERN_INFO "+ usb mouse was opened!\n");
+	return 0;
+}
+
 static void usb_mouse_irq(struct urb *urb) 
 {
 	struct usb_mouse *mouse = urb->context;
@@ -100,13 +110,12 @@ static void usb_mouse_irq(struct urb *urb)
 	case 0:
 		break;
 
-	case -ECONNRESET:	/* unlink */
+	case -ECONNRESET:
 	case -ENOENT:
 	case -ESHUTDOWN:
 		return;
 
-	/* -EPIPE:  should clear the halt */
-	default:		/* error */
+	default:
 		goto resubmit;
 	}
 
@@ -158,18 +167,6 @@ resubmit:
 	}
 }
 
-static int usb_mouse_open(struct input_dev *dev) 
-{
-	struct usb_mouse *mouse = input_get_drvdata(dev);
-
-	mouse->irq->dev = mouse->usbdev;
-	if (usb_submit_urb(mouse->irq, GFP_KERNEL)) {
-		return -EIO;
-	}
-
-	return 0;
-}
-
 static void usb_mouse_close(struct input_dev *dev) 
 {
 	struct usb_mouse *mouse = input_get_drvdata(dev);
@@ -183,16 +180,18 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 		return -ENODEV;
 	}
 
-	/* Установка информации о конечной точке*/
+	/* Получение информации о конечной точке*/
 	struct usb_endpoint_descriptor *endpoint = &interface->endpoint[0].desc;
 	if (!usb_endpoint_is_int_in(endpoint)) {
 		return -ENODEV;
 	}
 
+	/* Получение максимального значения пакетных данных */
 	struct usb_device *dev = interface_to_usbdev(intf);
 	int pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 	int maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
 
+	/* Аллокация структуры mouse и устройства ввода */
 	int error = -ENOMEM;
 	struct usb_mouse *mouse = kzalloc(sizeof(struct usb_mouse), GFP_KERNEL);
 	struct input_dev *input_dev = input_allocate_device();
@@ -200,15 +199,17 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 		goto fail1;
 	}
 
-	/* Аллокация структуры mouse */
+	/* Выделение начальной буфферной памяти USB-данных мыши */
 	mouse->data = usb_alloc_coherent(dev, 8, GFP_ATOMIC, &mouse->data_dma);
 	if (!mouse->data) {
 		goto fail1;
 	}
 
+	/* Аллокация urb */
 	mouse->irq = usb_alloc_urb(0, GFP_KERNEL);
-	if (!mouse->irq)
+	if (!mouse->irq) {
 		goto fail2;
+	}
 
 	/* Заполнение полей структуры mouse */
 	mouse->usbdev = dev;
@@ -232,6 +233,7 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 			 le16_to_cpu(dev->descriptor.idProduct));
 	}
 
+	/* Установка имени пути устройства */
 	usb_make_path(dev, mouse->phys, sizeof(mouse->phys));
 	strlcat(mouse->phys, "/input0", sizeof(mouse->phys));
 
@@ -253,9 +255,9 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	input_dev->open = usb_mouse_open;
 	input_dev->close = usb_mouse_close;
 
-	usb_fill_int_urb(mouse->irq, dev, pipe, mouse->data,
-			 (maxp > 8 ? 8 : maxp),
-			 usb_mouse_irq, mouse, endpoint->bInterval);
+	/* Инициализация urb */
+	usb_fill_int_urb(mouse->irq, dev, pipe, mouse->data, (maxp > 8 ? 8 : maxp),
+		usb_mouse_irq, mouse, endpoint->bInterval);
 	mouse->irq->transfer_dma = mouse->data_dma;
 	mouse->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
@@ -303,6 +305,8 @@ static void usb_mouse_disconnect(struct usb_interface *intf)
 		usb_free_coherent(interface_to_usbdev(intf), 8, mouse->data, mouse->data_dma);
 		kfree(mouse);
 	}
+
+	printk(KERN_INFO "+ usb mouse was disconnected!\n");
 }
 
 static const struct usb_device_id usb_mouse_id_table[] = {
@@ -333,7 +337,7 @@ static int __init usb_mouse_init(void)
 static void __exit usb_mouse_exit(void)
 {
 	usb_deregister(&usb_mouse_driver);
-	printk("+ module usb mouse driver unloaded!\n");
+	printk(KERN_INFO "+ module usb mouse driver unloaded!\n");
 }
 
 module_init(usb_mouse_init);
