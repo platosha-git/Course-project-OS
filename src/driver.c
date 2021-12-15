@@ -179,7 +179,6 @@ static void usb_mouse_close(struct input_dev *dev)
 static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_id *id) 
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
-	int error = -ENOMEM;
 
 	struct usb_host_interface *interface = intf->cur_altsetting;
 
@@ -258,7 +257,7 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	mouse->irq->transfer_dma = mouse->data_dma;
 	mouse->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
-	error = input_register_device(mouse->dev);
+	int error = input_register_device(mouse->dev);
 	if (error) {
 		goto fail3;
 	}
@@ -318,17 +317,21 @@ static struct usb_driver usb_mouse_driver = {
 	.id_table	= usb_mouse_id_table,
 };
 
-static int __init usb_mouse_driver_init(void)
+static int __init usb_mouse_init(void)
 {
-	printk("+ module usb mouse driver loaded!\n");
-	return usb_register(&usb_mouse_driver);
+	int retval = usb_register(&usb_mouse_driver);
+	if (retval == 0) {
+		printk(KERN_INFO "+ module usb mouse driver loaded!\n");
+	}
+
+	return retval;
 }
 
-static void __exit usb_mouse_driver_exit(void)
+static void __exit usb_mouse_exit(void)
 {
 	usb_deregister(&usb_mouse_driver);
 	printk("+ module usb mouse driver unloaded!\n");
 }
 
-module_init(usb_mouse_driver_init);
-module_exit(usb_mouse_driver_exit);
+module_init(usb_mouse_init);
+module_exit(usb_mouse_exit);
