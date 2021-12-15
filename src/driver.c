@@ -178,28 +178,29 @@ static void usb_mouse_close(struct input_dev *dev)
 
 static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_id *id) 
 {
-	struct usb_device *dev = interface_to_usbdev(intf);
-
 	struct usb_host_interface *interface = intf->cur_altsetting;
-
 	if (interface->desc.bNumEndpoints != 1) {
 		return -ENODEV;
 	}
 
+	/* Установка информации о конечной точке*/
 	struct usb_endpoint_descriptor *endpoint = &interface->endpoint[0].desc;
 	if (!usb_endpoint_is_int_in(endpoint)) {
 		return -ENODEV;
 	}
 
+	struct usb_device *dev = interface_to_usbdev(intf);
 	int pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 	int maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
 
+	int error = -ENOMEM;
 	struct usb_mouse *mouse = kzalloc(sizeof(struct usb_mouse), GFP_KERNEL);
 	struct input_dev *input_dev = input_allocate_device();
 	if (!mouse || !input_dev) {
 		goto fail1;
 	}
 
+	/* Аллокация структуры mouse */
 	mouse->data = usb_alloc_coherent(dev, 8, GFP_ATOMIC, &mouse->data_dma);
 	if (!mouse->data) {
 		goto fail1;
@@ -209,6 +210,7 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	if (!mouse->irq)
 		goto fail2;
 
+	/* Заполнение полей структуры mouse */
 	mouse->usbdev = dev;
 	mouse->dev = input_dev;
 
@@ -257,7 +259,7 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	mouse->irq->transfer_dma = mouse->data_dma;
 	mouse->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
-	int error = input_register_device(mouse->dev);
+	error = input_register_device(mouse->dev);
 	if (error) {
 		goto fail3;
 	}
@@ -267,10 +269,10 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	/* Create the kthread for sound playback */
 	playback_thread = kthread_run(playback_func, NULL, "sound_playback_thread");
 	if (IS_ERR(playback_thread)) {
-		printk(KERN_ERR "Could not create the playback thread.\n");
+		printk(KERN_ERR "+ could not create the playback thread!\n");
 	} 
 	else {
-		printk(KERN_INFO "Playback thread created.\n");
+		printk(KERN_INFO "+ playback thread was created!\n");
 	}
 
 	return 0;
@@ -282,6 +284,7 @@ fail2:
 fail1:	
 	input_free_device(input_dev);
 	kfree(mouse);
+	
 	return error;
 }
 
