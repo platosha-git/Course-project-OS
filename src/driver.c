@@ -284,7 +284,6 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	usb_set_intfdata(intf, mouse);
 
 	/* Создание потока ядра */
-	//playback_thread = kthread_run(playback_func, NULL, "sound_playback_thread");
 	playback_thread = kthread_create(playback_func, NULL, "sound_playback_thread");
 	if (!IS_ERR(playback_thread)) {
 		wake_up_process(playback_thread);
