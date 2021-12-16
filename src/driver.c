@@ -28,14 +28,22 @@ struct usb_mouse
 
 struct task_struct *playback_thread;
 
+struct button_click
+{
+	bool left;
+	bool middle;
+	bool right;
+};
+
+static struct button_click click = {
+	.left = false,
+	.middle = false,
+	.right = false
+};
+
 static int left_play = 0;
-static int left_clicked = 0;
-
-static int right_play = 0;
-static int right_clicked = 0;
-
 static int middle_play = 0;
-static int middle_clicked = 0;
+static int right_play = 0;
 
 
 static int playback_func(void *arg) 
@@ -44,7 +52,7 @@ static int playback_func(void *arg)
 		if (left_play) {
 			int result = -1;
 			
-			if (left_clicked) {
+			if (click.left) {
 				result = call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
 			}
 			else {
@@ -57,7 +65,7 @@ static int playback_func(void *arg)
 		if (right_play) {
 			int result = -1; 
 
-			if (right_clicked) {
+			if (click.right) {
 				result = call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
 			}
 			else {
@@ -69,7 +77,7 @@ static int playback_func(void *arg)
 
 		if (middle_play) {
 			int result = -1;
-			if (middle_clicked) {
+			if (click.middle) {
 				result = call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
 			}
 			else {
@@ -106,30 +114,30 @@ static void usb_mouse_irq(struct urb *urb)
 		goto resubmit;
 	}
 
-	if (left_clicked && !(data[0] & LEFT_BTN_BIT)) { /* negedge of left click */
-		left_clicked = 0;
+	if (click.left && !(data[0] & LEFT_BTN_BIT)) { /* negedge of left click */
+		click.left   = false;
 		left_play    = 1;
 	} 
-	else if (!left_clicked && (data[0] & LEFT_BTN_BIT)) { /* posedge of left click */
-		left_clicked = 1;
+	else if (!click.left && (data[0] & LEFT_BTN_BIT)) { /* posedge of left click */
+		click.left = true;
 		left_play    = 1;
 	}
 
-	if (right_clicked && !(data[0] & RGHT_BTN_BIT)) { /* negedge of right click */
-		right_clicked = 0;
+	if (click.right && !(data[0] & RGHT_BTN_BIT)) { /* negedge of right click */
+		click.right = false;
 		right_play    = 1;
 	} 
-	else if (!right_clicked && (data[0] & RGHT_BTN_BIT)) { /* posedge of right click */
-		right_clicked = 1;
+	else if (!click.right && (data[0] & RGHT_BTN_BIT)) { /* posedge of right click */
+		click.right = true;
 		right_play    = 1;
 	}
 
-	if (middle_clicked && !(data[0] & MIDL_BTN_BIT)) { /* negedge of middle click */
-		middle_clicked = 0;
+	if (click.middle && !(data[0] & MIDL_BTN_BIT)) { /* negedge of middle click */
+		click.middle = false;
 		middle_play    = 1;
 	} 
-	else if (!middle_clicked && (data[0] & MIDL_BTN_BIT)) { /* posedge of middle click */
-		middle_clicked = 1;
+	else if (!click.middle && (data[0] & MIDL_BTN_BIT)) { /* posedge of middle click */
+		click.middle = true;
 		middle_play    = 1;
 	}
 
