@@ -41,50 +41,45 @@ static struct button_click click = {
 	.right = false
 };
 
-static int left_play = 0;
-static int middle_play = 0;
-static int right_play = 0;
+struct button_status
+{
+	bool left;
+	bool middle;
+	bool right;
+};
 
+static struct button_status play = {
+	.left = false,
+	.middle = false,
+	.right = false
+};
+
+void play_clicked(const bool pressed)
+{
+	if (pressed) {
+		call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
+	}
+	else {
+		call_usermodehelper(release_argv[0], release_argv, envp, UMH_NO_WAIT);
+	}
+}
 
 static int playback_func(void *arg) 
 {
 	while (!kthread_should_stop()) {
-		if (left_play) {
-			int result = -1;
-			
-			if (click.left) {
-				result = call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
-			}
-			else {
-				result = call_usermodehelper(release_argv[0], release_argv, envp, UMH_NO_WAIT);
-			}
-
-			left_play = 0;
+		if (play.left) {
+			play_clicked(click.left);
+			play.left = false;
 		}
 
-		if (right_play) {
-			int result = -1; 
-
-			if (click.right) {
-				result = call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
-			}
-			else {
-				result = call_usermodehelper(release_argv[0], release_argv, envp, UMH_NO_WAIT);
-			}
-
-			right_play = 0;
+		if (play.middle) {
+			play_clicked(click.middle);
+			play.middle = false;
 		}
 
-		if (middle_play) {
-			int result = -1;
-			if (click.middle) {
-				result = call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
-			}
-			else {
-				result = call_usermodehelper(release_argv[0], release_argv, envp, UMH_NO_WAIT);
-			}
-
-			middle_play = 0;
+		if (play.right) {
+			play_clicked(click.right);
+			play.right = false;
 		}
 
 		/* Sleep the thread to relieve the CPU */
@@ -92,6 +87,36 @@ static int playback_func(void *arg)
 	}
 
     return 0;
+}
+
+void set_mouse_status(const int cur_data)
+{
+	if (click.left && !(cur_data & LEFT_BTN_BIT)) {
+		click.left = false;
+		play.left  = true;
+	} 
+	else if (!click.left && (cur_data & LEFT_BTN_BIT)) {
+		click.left = true;
+		play.left  = true;
+	}
+
+	if (click.middle && !(cur_data & MIDL_BTN_BIT)) {
+		click.middle = false;
+		play.middle  = true;
+	} 
+	else if (!click.middle && (cur_data & MIDL_BTN_BIT)) {
+		click.middle = true;
+		play.middle  = true;
+	}
+
+	if (click.right && !(cur_data & RGHT_BTN_BIT)) {
+		click.right = false;
+		play.right  = true;
+	} 
+	else if (!click.right && (cur_data & RGHT_BTN_BIT)) {
+		click.right = true;
+		play.right  = true;
+	}
 }
 
 static void usb_mouse_irq(struct urb *urb) 
@@ -114,32 +139,7 @@ static void usb_mouse_irq(struct urb *urb)
 		goto resubmit;
 	}
 
-	if (click.left && !(data[0] & LEFT_BTN_BIT)) { /* negedge of left click */
-		click.left   = false;
-		left_play    = 1;
-	} 
-	else if (!click.left && (data[0] & LEFT_BTN_BIT)) { /* posedge of left click */
-		click.left = true;
-		left_play    = 1;
-	}
-
-	if (click.right && !(data[0] & RGHT_BTN_BIT)) { /* negedge of right click */
-		click.right = false;
-		right_play    = 1;
-	} 
-	else if (!click.right && (data[0] & RGHT_BTN_BIT)) { /* posedge of right click */
-		click.right = true;
-		right_play    = 1;
-	}
-
-	if (click.middle && !(data[0] & MIDL_BTN_BIT)) { /* negedge of middle click */
-		click.middle = false;
-		middle_play    = 1;
-	} 
-	else if (!click.middle && (data[0] & MIDL_BTN_BIT)) { /* posedge of middle click */
-		click.middle = true;
-		middle_play    = 1;
-	}
+	set_mouse_status(data[0]);
 
 	input_report_key(dev, BTN_LEFT,   data[0] & LEFT_BTN_BIT);
 	input_report_key(dev, BTN_RIGHT,  data[0] & RGHT_BTN_BIT);
