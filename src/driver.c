@@ -89,31 +89,31 @@ static int playback_func(void *arg)
     return 0;
 }
 
-void set_mouse_status(const int cur_data)
+void set_mouse_status(const int cur_btn)
 {
-	if (click.left && !(cur_data & LEFT_BTN_BIT)) {
+	if (click.left && !(cur_btn & LEFT_BTN_BIT)) {
 		click.left = false;
 		play.left  = true;
 	} 
-	else if (!click.left && (cur_data & LEFT_BTN_BIT)) {
+	else if (!click.left && (cur_btn & LEFT_BTN_BIT)) {
 		click.left = true;
 		play.left  = true;
 	}
 
-	if (click.middle && !(cur_data & MIDL_BTN_BIT)) {
+	if (click.middle && !(cur_btn & MIDL_BTN_BIT)) {
 		click.middle = false;
 		play.middle  = true;
 	} 
-	else if (!click.middle && (cur_data & MIDL_BTN_BIT)) {
+	else if (!click.middle && (cur_btn & MIDL_BTN_BIT)) {
 		click.middle = true;
 		play.middle  = true;
 	}
 
-	if (click.right && !(cur_data & RGHT_BTN_BIT)) {
+	if (click.right && !(cur_btn & RGHT_BTN_BIT)) {
 		click.right = false;
 		play.right  = true;
 	} 
-	else if (!click.right && (cur_data & RGHT_BTN_BIT)) {
+	else if (!click.right && (cur_btn & RGHT_BTN_BIT)) {
 		click.right = true;
 		play.right  = true;
 	}
@@ -284,13 +284,15 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	usb_set_intfdata(intf, mouse);
 
 	/* Создание потока ядра */
-	playback_thread = kthread_run(playback_func, NULL, "sound_playback_thread");
-	if (IS_ERR(playback_thread)) {
-		printk(KERN_ERR "+ could not create the playback thread!\n");
-		goto fail3;
+	//playback_thread = kthread_run(playback_func, NULL, "sound_playback_thread");
+	playback_thread = kthread_create(playback_func, NULL, "sound_playback_thread");
+	if (!IS_ERR(playback_thread)) {
+		wake_up_process(playback_thread);
+		printk(KERN_INFO "+ playback thread was created!\n");
 	} 
 	else {
-		printk(KERN_INFO "+ playback thread was created!\n");
+		printk(KERN_ERR "+ could not create the playback thread!\n");
+		goto fail3;
 	}
 
 	return 0;
