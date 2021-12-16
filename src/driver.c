@@ -302,7 +302,7 @@ static void usb_mouse_disconnect(struct usb_interface *intf)
 {
 	struct usb_mouse *mouse = usb_get_intfdata (intf);
 
-	/* Stop the playback thread */
+	/* Остановка потока */
 	kthread_stop(playback_thread);
 
 	usb_set_intfdata(intf, NULL);
