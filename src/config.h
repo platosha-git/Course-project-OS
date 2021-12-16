@@ -1,5 +1,9 @@
 #include <stddef.h>
 
+#define DRIVER_VERSION "v1.0"
+#define DRIVER_AUTHOR "Platonova Olga"
+#define DRIVER_DESC "USB Mouse Click Sound Driver"
+
 /* Button codes */
 #define LEFT_BTN_BIT 0x01
 #define RGHT_BTN_BIT 0X02

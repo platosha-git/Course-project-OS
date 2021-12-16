@@ -9,8 +9,8 @@
 #include <linux/delay.h>
 #include "config.h"
 
-MODULE_AUTHOR("Olga");
-MODULE_DESCRIPTION("USB Mouse sound driver");
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 struct usb_mouse 
@@ -86,19 +86,6 @@ static int playback_func(void *arg)
     return 0;
 }
 
-static int usb_mouse_open(struct input_dev *dev) 
-{
-	struct usb_mouse *mouse = input_get_drvdata(dev);
-
-	mouse->irq->dev = mouse->usbdev;
-	if (usb_submit_urb(mouse->irq, GFP_KERNEL)) {
-		return -EIO;
-	}
-
-	printk(KERN_INFO "+ usb mouse was opened!\n");
-	return 0;
-}
-
 static void usb_mouse_irq(struct urb *urb) 
 {
 	struct usb_mouse *mouse = urb->context;
@@ -167,10 +154,24 @@ resubmit:
 	}
 }
 
+static int usb_mouse_open(struct input_dev *dev) 
+{
+	struct usb_mouse *mouse = input_get_drvdata(dev);
+
+	mouse->irq->dev = mouse->usbdev;
+	if (usb_submit_urb(mouse->irq, GFP_KERNEL)) {
+		return -EIO;
+	}
+
+	printk(KERN_INFO "+ usb mouse was opened!\n");
+	return 0;
+}
+
 static void usb_mouse_close(struct input_dev *dev) 
 {
 	struct usb_mouse *mouse = input_get_drvdata(dev);
 	usb_kill_urb(mouse->irq);
+	printk(KERN_INFO "+ usb mouse was closed!\n");
 }
 
 static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_id *id) 
