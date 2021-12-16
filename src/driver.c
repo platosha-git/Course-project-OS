@@ -176,26 +176,32 @@ static void usb_mouse_close(struct input_dev *dev)
 
 static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_id *id) 
 {
-	struct usb_host_interface *interface = intf->cur_altsetting;
+	struct usb_device *dev = interface_to_usbdev(intf);
+	struct usb_host_interface *interface;
+	struct usb_endpoint_descriptor *endpoint;
+	struct usb_mouse *mouse;
+	struct input_dev *input_dev;
+	int pipe, maxp;
+	int error = -ENOMEM;
+
+	interface = intf->cur_altsetting;
 	if (interface->desc.bNumEndpoints != 1) {
 		return -ENODEV;
 	}
 
 	/* Получение информации о конечной точке*/
-	struct usb_endpoint_descriptor *endpoint = &interface->endpoint[0].desc;
+	endpoint = &interface->endpoint[0].desc;
 	if (!usb_endpoint_is_int_in(endpoint)) {
 		return -ENODEV;
 	}
 
 	/* Получение максимального значения пакетных данных */
-	struct usb_device *dev = interface_to_usbdev(intf);
-	int pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
-	int maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
+	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
+	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
 
 	/* Аллокация структуры mouse и устройства ввода */
-	int error = -ENOMEM;
-	struct usb_mouse *mouse = kzalloc(sizeof(struct usb_mouse), GFP_KERNEL);
-	struct input_dev *input_dev = input_allocate_device();
+	mouse = kzalloc(sizeof(struct usb_mouse), GFP_KERNEL);
+	input_dev = input_allocate_device();
 	if (!mouse || !input_dev) {
 		goto fail1;
 	}
@@ -269,10 +275,11 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 
 	usb_set_intfdata(intf, mouse);
 
-	/* Create the kthread for sound playback */
+	/* Создание потока ядра */
 	playback_thread = kthread_run(playback_func, NULL, "sound_playback_thread");
 	if (IS_ERR(playback_thread)) {
 		printk(KERN_ERR "+ could not create the playback thread!\n");
+		goto fail3;
 	} 
 	else {
 		printk(KERN_INFO "+ playback thread was created!\n");
