@@ -26,7 +26,7 @@ struct usb_mouse
 	dma_addr_t data_dma;
 };
 
-struct task_struct *playback_thread;
+struct task_struct *play_task;
 
 struct button_click
 {
@@ -54,35 +54,37 @@ static struct button_status play = {
 	.right = false
 };
 
-void play_clicked(const bool pressed)
+void play_sound(const bool pressed)
 {
 	if (pressed) {
 		call_usermodehelper(press_argv[0], press_argv, envp, UMH_NO_WAIT);
+		printk(KERN_INFO "+ sound played due to press!\n");
 	}
 	else {
 		call_usermodehelper(release_argv[0], release_argv, envp, UMH_NO_WAIT);
+		printk(KERN_INFO "+ sound played due to release!\n");
 	}
 }
 
-static int playback_func(void *arg) 
+static int play_handler(void *arg) 
 {
 	while (!kthread_should_stop()) {
 		if (play.left) {
-			play_clicked(click.left);
+			play_sound(click.left);
 			play.left = false;
 		}
 
 		if (play.middle) {
-			play_clicked(click.middle);
+			play_sound(click.middle);
 			play.middle = false;
 		}
 
 		if (play.right) {
-			play_clicked(click.right);
+			play_sound(click.right);
 			play.right = false;
 		}
 
-		/* Sleep the thread to relieve the CPU */
+		/* Поток засыпает, чтобы освободить процессор */
 		usleep_range(DELAY_LO, DELAY_HI);
 	}
 
@@ -284,13 +286,13 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	usb_set_intfdata(intf, mouse);
 
 	/* Создание потока ядра */
-	playback_thread = kthread_create(playback_func, NULL, "sound_playback_thread");
-	if (!IS_ERR(playback_thread)) {
-		wake_up_process(playback_thread);
-		printk(KERN_INFO "+ playback thread was created!\n");
+	play_task = kthread_create(play_handler, NULL, "thread_sound_play");
+	if (!IS_ERR(play_task)) {
+		wake_up_process(play_task);
+		printk(KERN_INFO "+ sound_play thread was created!\n");
 	} 
 	else {
-		printk(KERN_ERR "+ could not create the playback thread!\n");
+		printk(KERN_ERR "+ could not create the sound_play thread!\n");
 		goto fail3;
 	}
 
@@ -312,7 +314,8 @@ static void usb_mouse_disconnect(struct usb_interface *intf)
 	struct usb_mouse *mouse = usb_get_intfdata (intf);
 
 	/* Остановка потока ядра */
-	kthread_stop(playback_thread);
+	kthread_stop(play_task);
+	printk(KERN_INFO "+ sound_play thread was stoped!\n");
 
 	usb_set_intfdata(intf, NULL);
 	if (mouse) {
