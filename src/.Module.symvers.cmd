@@ -1,1 +1,0 @@
-cmd_/home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/Module.symvers := sed 's/ko$$/o/' /home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/modules.order | scripts/mod/modpost -m -a   -o /home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/Module.symvers -e -i Module.symvers   -T -

@@ -119,12 +119,21 @@ void set_mouse_status(const int cur_btn)
 	}
 }
 
+static void resubmit(struct urb *urb, struct usb_mouse *mouse)
+{
+	int status = usb_submit_urb(urb, GFP_ATOMIC);
+	if (status) {
+		dev_err(&mouse->usbdev->dev, "can't resubmit intr, %s-%s/input0, status %d\n",
+				mouse->usbdev->bus->bus_name,
+				mouse->usbdev->devpath, status);
+	}
+}
+
 static void usb_mouse_irq(struct urb *urb) 
 {
 	struct usb_mouse *mouse = urb->context;
 	signed char *data = mouse->data;
 	struct input_dev *dev = mouse->dev;
-	int status = 0;
 
 	switch (urb->status) {
 	case 0:
@@ -136,7 +145,8 @@ static void usb_mouse_irq(struct urb *urb)
 		return;
 
 	default:
-		goto resubmit;
+		resubmit(urb, mouse);
+		return;
 	}
 
 	set_mouse_status(data[0]);
@@ -153,13 +163,7 @@ static void usb_mouse_irq(struct urb *urb)
 
 	input_sync(dev);
 
-resubmit:
-	status = usb_submit_urb (urb, GFP_ATOMIC);
-	if (status) {
-		dev_err(&mouse->usbdev->dev, "can't resubmit intr, %s-%s/input0, status %d\n",
-				mouse->usbdev->bus->bus_name,
-				mouse->usbdev->devpath, status);
-	}
+	resubmit(urb, mouse);
 }
 
 static int usb_mouse_open(struct input_dev *dev) 
@@ -182,6 +186,17 @@ static void usb_mouse_close(struct input_dev *dev)
 	printk(KERN_INFO "+ usb mouse was closed!\n");
 }
 
+static void free_devices(struct input_dev *input_dev, struct usb_mouse *mouse,
+	struct usb_device *dev)
+{
+	input_free_device(input_dev);
+	kfree(mouse);
+
+	if (dev != NULL) {
+		usb_free_coherent(dev, 8, mouse->data, mouse->data_dma);
+	}
+}
+
 static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_id *id) 
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
@@ -189,8 +204,7 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_mouse *mouse;
 	struct input_dev *input_dev;
-	int pipe, maxp;
-	int error = -ENOMEM;
+	int pipe, maxp, error;
 
 	interface = intf->cur_altsetting;
 	if (interface->desc.bNumEndpoints != 1) {
@@ -211,19 +225,22 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	mouse = kzalloc(sizeof(struct usb_mouse), GFP_KERNEL);
 	input_dev = input_allocate_device();
 	if (!mouse || !input_dev) {
-		goto fail1;
+		free_devices(input_dev, mouse, NULL);
+		return -ENOMEM;
 	}
 
 	/* Выделение начальной буфферной памяти USB-данных мыши */
 	mouse->data = usb_alloc_coherent(dev, 8, GFP_ATOMIC, &mouse->data_dma);
 	if (!mouse->data) {
-		goto fail1;
+		free_devices(input_dev, mouse, NULL);
+		return -ENOMEM;
 	}
 
 	/* Аллокация urb */
 	mouse->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!mouse->irq) {
-		goto fail2;
+		free_devices(input_dev, mouse, dev);
+		return -ENOMEM;
 	}
 
 	/* Заполнение полей структуры mouse */
@@ -278,7 +295,9 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 
 	error = input_register_device(mouse->dev);
 	if (error) {
-		goto fail3;
+		usb_free_urb(mouse->irq);
+		free_devices(input_dev, mouse, dev);
+		return -ENOMEM;
 	}
 
 	usb_set_intfdata(intf, mouse);
@@ -291,20 +310,12 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 	} 
 	else {
 		printk(KERN_ERR "+ could not create the sound_play thread!\n");
-		goto fail3;
+		usb_free_urb(mouse->irq);
+		free_devices(input_dev, mouse, dev);
+		return -ENOMEM;
 	}
 
 	return 0;
-
-fail3:	
-	usb_free_urb(mouse->irq);
-fail2:	
-	usb_free_coherent(dev, 8, mouse->data, mouse->data_dma);
-fail1:	
-	input_free_device(input_dev);
-	kfree(mouse);
-	
-	return error;
 }
 
 static void usb_mouse_disconnect(struct usb_interface *intf) 
