@@ -1,0 +1,1 @@
+cmd_/home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/driver.mod := { echo  /home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/driver.o;  echo; } > /home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/driver.mod

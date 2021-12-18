@@ -1,0 +1,1 @@
+cmd_/home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/driver.ko := ld -r -m elf_x86_64  --build-id=sha1  -T scripts/module.lds -o /home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/driver.ko /home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/driver.o /home/platosha/Desktop/BMSTU/7sem/Course-Project-OS/src/driver.mod.o;  true
